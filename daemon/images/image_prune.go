@@ -29,6 +29,7 @@ var imagesAcceptedFilters = map[string]bool{
 // one is in progress
 var errPruneRunning = errdefs.Conflict(errors.New("a prune operation is already running"))
 
+// dangling 이미지를 삭제하는 함수
 // ImagesPrune removes unused images
 func (i *ImageService) ImagesPrune(ctx context.Context, pruneFilters filters.Args) (*types.ImagesPruneReport, error) {
 	if !atomic.CompareAndSwapInt32(&i.pruneRunning, 0, 1) {
@@ -44,8 +45,10 @@ func (i *ImageService) ImagesPrune(ctx context.Context, pruneFilters filters.Arg
 
 	rep := &types.ImagesPruneReport{}
 
+	// dangling default는 true
 	danglingOnly := true
 	if pruneFilters.Contains("dangling") {
+		// docker prune --filter dangling=false or dangling=0
 		if pruneFilters.ExactMatch("dangling", "false") || pruneFilters.ExactMatch("dangling", "0") {
 			danglingOnly = false
 		} else if !pruneFilters.ExactMatch("dangling", "true") && !pruneFilters.ExactMatch("dangling", "1") {
@@ -53,18 +56,23 @@ func (i *ImageService) ImagesPrune(ctx context.Context, pruneFilters filters.Arg
 		}
 	}
 
+	// until에 입력된 timestamp를 return
 	until, err := getUntilFromPruneFilters(pruneFilters)
+	// until이 args로 안들어와도 err를 return 하지는 않는다.
 	if err != nil {
 		return nil, err
 	}
 
 	var allImages map[image.ID]*image.Image
 	if danglingOnly {
+		// Heads는 dangling image(children이 없는 image)를 가져옴
 		allImages = i.imageStore.Heads()
 	} else {
+		// Map은 모든 image를 다 가져옴
 		allImages = i.imageStore.Map()
 	}
 
+	// image의 layer를 다 불러옴
 	// Filter intermediary images and get their unique size
 	allLayers := make(map[layer.ChainID]layer.Layer)
 	for _, ls := range i.layerStores {
@@ -75,23 +83,29 @@ func (i *ImageService) ImagesPrune(ctx context.Context, pruneFilters filters.Arg
 	topImages := map[image.ID]*image.Image{}
 	for id, img := range allImages {
 		select {
+		// ctx.Done 으로 받아옴
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		default:
 			dgst := digest.Digest(id)
+			// image의 digest가 없고, children image가 있을 때 continue
 			if len(i.referenceStore.References(dgst)) == 0 && len(i.imageStore.Children(id)) != 0 {
 				continue
 			}
+			// until이 zero가 아니면서(args로 들어왔고) until 이후에 생성된 image라면 continue
 			if !until.IsZero() && img.Created.After(until) {
 				continue
 			}
+			// config가 args로 들어왔고 Label이 match가 안되면 continue
 			if img.Config != nil && !matchLabels(pruneFilters, img.Config.Labels) {
 				continue
 			}
+			// 위 조건에 해당 안되면 topImage에 넣는다
 			topImages[id] = img
 		}
 	}
 
+	// TODO : 10/7
 	canceled := false
 deleteImagesLoop:
 	for id := range topImages {

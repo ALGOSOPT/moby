@@ -17,7 +17,7 @@ import (
 // imageName (alternatively, imageName can also be an image ID).
 
 // imageName : original Image Name or ID
-// repository : new Image Name without tag
+// repository : new Image Name with latest?
 // tag : new tag
 func (i *ImageService) TagImage(imageName, repository, tag string) (string, error) {
 	img, err := i.GetImage(imageName)
