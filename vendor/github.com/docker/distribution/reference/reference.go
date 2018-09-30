@@ -73,11 +73,14 @@ type Field struct {
 	reference Reference
 }
 
+// reference를 받아서 Field를 만들어서 return.
 // AsField wraps a reference in a Field for encoding.
 func AsField(reference Reference) Field {
 	return Field{reference}
 }
 
+// Field struct의 method들. 
+// Field안의 reference를 return
 // Reference unwraps the reference type from the field to
 // return the Reference object. This object should be
 // of the appropriate type to further check for different
@@ -86,12 +89,17 @@ func (f Field) Reference() Reference {
 	return f.reference
 }
 
+// Marshalling : 한 객체의 메모리에서의 표현방식을 저장 
+//또는 전송에 적합한 다른 데이터 형식으로 변환하는 과정
+// Field 안의 reference.String을 byte로 변환해서 반환
 // MarshalText serializes the field to byte text which
 // is the string of the reference.
 func (f Field) MarshalText() (p []byte, err error) {
 	return []byte(f.reference.String()), nil
 }
 
+
+// byte를 인자로 받아서 field를 return
 // UnmarshalText parses text bytes by invoking the
 // reference parser to ensure the appropriately
 // typed reference object is wrapped by field.
@@ -105,24 +113,29 @@ func (f *Field) UnmarshalText(p []byte) error {
 	return nil
 }
 
+// 단지 image의 name. ex)ubuntu
 // Named is an object with a full name
 type Named interface {
 	Reference
 	Name() string
 }
 
+// tag
 // Tagged is an object which has a tag
 type Tagged interface {
 	Reference
 	Tag() string
 }
 
+// domain + path + name 일수도 있고 단지 name일 수도있고
+// + tag
 // NamedTagged is an object including a name and tag.
 type NamedTagged interface {
 	Named
 	Tag() string
 }
 
+// image의 hash 값
 // Digested is an object which has a digest
 // in which it can be referenced by
 type Digested interface {
@@ -130,6 +143,7 @@ type Digested interface {
 	Digest() digest.Digest
 }
 
+//  name과 hash 값을 같이 가지고 있고 사용처가 Digested랑 다를 것임.
 // Canonical reference is an object with a fully unique
 // name including a name with domain and digest
 type Canonical interface {
@@ -137,6 +151,8 @@ type Canonical interface {
 	Digest() digest.Digest
 }
 
+// Domain + path + name
+// reference package 안에서만 사용하는 애(첫글자가 소문자라서)
 // namedRepository is a reference to a repository with a name.
 // A namedRepository has both domain and path components.
 type namedRepository interface {
@@ -145,8 +161,11 @@ type namedRepository interface {
 	Path() string
 }
 
+//.() -> assertion
+// domain을 return한다.
 // Domain returns the domain part of the Named reference
 func Domain(named Named) string {
+	//named가 namedRepository object임을 확인.
 	if r, ok := named.(namedRepository); ok {
 		return r.Domain()
 	}
@@ -154,6 +173,7 @@ func Domain(named Named) string {
 	return domain
 }
 
+//path를 return한다.
 // Path returns the name without the domain part of the Named reference
 func Path(named Named) (name string) {
 	if r, ok := named.(namedRepository); ok {
@@ -163,11 +183,17 @@ func Path(named Named) (name string) {
 	return path
 }
 
+//name을 받아서 /를 기준으로 분리
 func splitDomain(name string) (string, string) {
+	//FindStringSubmatch : 정규표현식으로 문자열을 검색한 뒤 찾은 문자열과 
+	//괄호로 구분된 하위 항목을 리턴
+	//FindStringSubmatch()이 반환 값은 배열인데, 0번째는 full name이고
+	//n번째가 /로 분리된 것들이다.
 	match := anchoredNameRegexp.FindStringSubmatch(name)
 	if len(match) != 3 {
 		return "", name
 	}
+	//match[1] : domain, match[2] : path, match[3] : name
 	return match[1], match[2]
 }
 
@@ -176,6 +202,7 @@ func splitDomain(name string) (string, string) {
 // found, the hostname is empty and the full value
 // is returned as name
 // DEPRECATED: Use Domain or Path
+// 쓰지마라!
 func SplitHostname(named Named) (string, string) {
 	if r, ok := named.(namedRepository); ok {
 		return r.Domain(), r.Path()
@@ -183,6 +210,8 @@ func SplitHostname(named Named) (string, string) {
 	return splitDomain(named.Name())
 }
 
+// string을 입력으로 받아서 Reference 형태로 바꾸어보고, 되면
+// Reference와 ok를 return하고 안되면 nil과 error를 return
 // Parse parses s and returns a syntactically valid Reference.
 // If an error was encountered it is returned, along with a nil Reference.
 // NOTE: Parse will not handle short digests.
@@ -233,6 +262,9 @@ func Parse(s string) (Reference, error) {
 	return r, nil
 }
 
+
+// string을 입력으로 받아서 name을 가지고 있고 canonical object여야만 parsing되어 
+// name을 return한다.
 // ParseNamed parses s and returns a syntactically valid reference implementing
 // the Named interface. The reference must have a name and be in the canonical
 // form, otherwise an error is returned.
@@ -249,6 +281,7 @@ func ParseNamed(s string) (Named, error) {
 	return named, nil
 }
 
+// string을 받아서 repository object를 만들어서 반환
 // WithName returns a named object representing the given string. If the input
 // is invalid ErrReferenceInvalidFormat will be returned.
 func WithName(name string) (Named, error) {
@@ -266,6 +299,7 @@ func WithName(name string) (Named, error) {
 	}, nil
 }
 
+// named와 tag를 받아서 name에다가 tag를 붙여서 반환
 // WithTag combines the name from "name" and the tag from "tag" to form a
 // reference incorporating both the name and the tag.
 func WithTag(name Named, tag string) (NamedTagged, error) {
@@ -292,6 +326,7 @@ func WithTag(name Named, tag string) (NamedTagged, error) {
 	}, nil
 }
 
+// name에다가 digest를 붙여서 반환
 // WithDigest combines the name from "name" and the digest from "digest" to form
 // a reference incorporating both the name and the digest.
 func WithDigest(name Named, digest digest.Digest) (Canonical, error) {
@@ -318,6 +353,7 @@ func WithDigest(name Named, digest digest.Digest) (Canonical, error) {
 	}, nil
 }
 
+// tag와 digest를 제거
 // TrimNamed removes any tag or digest from the named reference.
 func TrimNamed(ref Named) Named {
 	domain, path := SplitHostname(ref)
@@ -327,7 +363,9 @@ func TrimNamed(ref Named) Named {
 	}
 }
 
+
 func getBestReferenceType(ref reference) Reference {
+	
 	if ref.Name() == "" {
 		// Allow digest only references
 		if ref.digest != "" {
@@ -353,6 +391,8 @@ func getBestReferenceType(ref reference) Reference {
 
 	return ref
 }
+
+
 
 type reference struct {
 	namedRepository
