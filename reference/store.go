@@ -21,12 +21,14 @@ var (
 )
 
 // An Association is a tuple associating a reference with an image ID.
+// image의 value
 type Association struct {
 	Ref reference.Named
 	ID  digest.Digest
 }
 
 // Store provides the set of methods which can operate on a reference store.
+// image의 action
 type Store interface {
 	References(id digest.Digest) []reference.Named
 	ReferencesByName(ref reference.Named) []Association
@@ -68,6 +70,11 @@ func (a lexicalAssociations) Less(i, j int) bool {
 	return a[i].Ref.String() < a[j].Ref.String()
 }
 
+
+// 1. 아마도 image에 대한 metadata(json 형식)가 저장되어있는 파일의 path를 받는다.
+// 2. path를 절대경로로 바꾼다.
+// 3. store struct를 만든다
+// 4. store 없으면 생성 그리고 리턴
 // NewReferenceStore creates a new reference store, tied to a file path where
 // the set of references are serialized in JSON format.
 func NewReferenceStore(jsonPath string) (Store, error) {
@@ -91,6 +98,7 @@ func NewReferenceStore(jsonPath string) (Store, error) {
 	}
 	return store, nil
 }
+
 
 // AddTag adds a tag reference to the store. If force is set to true, existing
 // references can be overwritten. This only works for tags, not digests.
@@ -124,6 +132,7 @@ func favorDigest(originalRef reference.Named) (reference.Named, error) {
 	return ref, nil
 }
 
+// TODO : algosopt 9/30
 func (store *store) addReference(ref reference.Named, id digest.Digest, force bool) error {
 	ref, err := favorDigest(ref)
 	if err != nil {

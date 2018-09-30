@@ -111,6 +111,7 @@ func (i *ImageService) ImageDelete(imageRef string, force, prune bool) ([]types.
 		i.LogImageEvent(imgID.String(), imgID.String(), "untag")
 		records = append(records, untaggedRecord)
 
+		// TODO : algosopt 얘 중복??(76)
 		repoRefs = i.referenceStore.References(imgID.Digest())
 
 		// If a tag reference was removed and the only remaining
